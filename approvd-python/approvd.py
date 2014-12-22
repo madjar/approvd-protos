@@ -50,6 +50,9 @@ def handle_pull(i):
         post("statuses", sha, data=json.dumps(data)).json()
         print('Change the state of {} ({}) to {}'.format(
             i, pull['title'], new_state))
+    else:
+        print('No change on {} ({})'.format(i, pull['title']))
+
 
 def handle_repo():
     pulls = get('pulls').json()
