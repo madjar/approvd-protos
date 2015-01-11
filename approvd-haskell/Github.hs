@@ -14,13 +14,15 @@ import Network.Wreq.Types (Postable)
 
 type Token = B.ByteString
 
+data GithubConfig = GithubConfig { gToken :: B.ByteString }
+
 -- | A monad that call the github api with a given authentication
-newtype Github a = Github { runG :: ReaderT Token IO a }
+newtype Github a = Github { runG :: ReaderT GithubConfig IO a }
                  deriving (Functor, Monad, Applicative)
 
 -- | Run Github with a given auth and extract the final value
 runGithub :: Token -> Github a -> IO a
-runGithub t g = runReaderT (runG g) t
+runGithub t g = runReaderT (runG g) (GithubConfig t)
 
 -- | Run a get request to a github endpoint in the Github monad
 get :: [String] -> Github L.ByteString
@@ -40,12 +42,12 @@ request :: RequestF -> [String] -> Github L.ByteString
 request method components = Github g
   where g = do
           let url = intercalate "/" (githubUrl:components)
-          auth <- ask
-          r <- liftIO $ method (options auth) url
+          config <- ask
+          r <- liftIO $ method (options $ gToken config) url
           return $ r ^. W.responseBody
 
 userAgent = "Approvd.io bot/0.1 (@madjar)"
 
-options :: Token -> W.Options
+options :: B.ByteString -> W.Options
 options token = W.defaults & W.header "User-Agent" .~ [userAgent]
                            & W.auth ?~ W.oauth2Token token
