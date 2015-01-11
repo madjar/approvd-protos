@@ -11,8 +11,8 @@ import qualified Data.Text as T
 
 import Github (Github, runGithub, get, post)
 
-auth :: IO (Maybe B.ByteString)
-auth = Just <$> B.init <$> B.readFile "../token"
+auth :: IO B.ByteString
+auth = B.init <$> B.readFile "../token"
 
 context :: String
 context = "approvd-haskell-proto"

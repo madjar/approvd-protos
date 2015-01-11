@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving #-}
-module Github (Github, Auth, Token, runGithub, get, post) where
+module Github (Github, Token, runGithub, get, post) where
 
 import Control.Applicative (Applicative)
 import Control.Lens ((^.), (&), (?~), (.~))
@@ -13,14 +13,13 @@ import Network.Wreq.Types (Postable)
 
 
 type Token = B.ByteString
-type Auth = Maybe Token
 
 -- | A monad that call the github api with a given authentication
-newtype Github a = Github { runG :: ReaderT Auth IO a }
+newtype Github a = Github { runG :: ReaderT Token IO a }
                  deriving (Functor, Monad, Applicative)
 
 -- | Run Github with a given auth and extract the final value
-runGithub :: Auth -> Github a -> IO a
+runGithub :: Token -> Github a -> IO a
 runGithub t g = runReaderT (runG g) t
 
 -- | Run a get request to a github endpoint in the Github monad
@@ -47,8 +46,6 @@ request method components = Github g
 
 userAgent = "Approvd.io bot/0.1 (@madjar)"
 
-options :: Auth -> W.Options
-options auth = authopts & W.header "User-Agent" .~ [userAgent]
-  where authopts = case auth of
-                    Just t -> W.defaults & W.auth ?~ W.oauth2Token t
-                    Nothing -> W.defaults
+options :: Token -> W.Options
+options token = W.defaults & W.header "User-Agent" .~ [userAgent]
+                           & W.auth ?~ W.oauth2Token token
