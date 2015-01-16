@@ -36,7 +36,7 @@ get = request W.getWith
 -- | Run a post request to a github endpoint in the Github monad
 post :: Postable a => [String] -> a -> Github L.ByteString
 post url p = request postWith' url
-  where postWith' opts url = W.postWith opts url p
+  where postWith' opts url' = W.postWith opts url' p
 
 -- | Get a url relative to the repo
 getRepo :: [String] -> Github L.ByteString
@@ -50,10 +50,11 @@ postRepo url p = do url' <- repoUrl url
 -- | Constructs an url where the rooted at the repo api endpoint
 repoUrl :: [String] -> Github [String]
 repoUrl url = do config <- Github ask
-                 return $ "repos":(gUser config):(gRepo config):url
+                 return $ "repos":gUser config:gRepo config:url
 
 type RequestF = W.Options -> String -> IO (W.Response L.ByteString)
 
+githubUrl :: String
 githubUrl = "https://api.github.com"
 
 request :: RequestF -> [String] -> Github L.ByteString
@@ -63,6 +64,7 @@ request method components = Github $ do
           r <- liftIO $ method (options $ gToken config) url
           return $ r ^. W.responseBody
 
+userAgent :: B.ByteString
 userAgent = "Approvd.io bot/0.1 (@madjar)"
 
 options :: B.ByteString -> W.Options
