@@ -28,6 +28,7 @@ executable approvd-haskell
                      , regex-pcre
                      , text
                      , transformers
+                     , vector
                      , wreq
   -- hs-source-dirs:      
   default-language:    Haskell2010
