@@ -1,10 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 import Control.Applicative ((<$>))
-import Control.Lens ((^.))
-import Control.Monad (mfilter)
+import Control.Lens ((^.), (^?))
+import Control.Monad (mfilter, when)
+import Control.Monad.Trans (liftIO)
 import Data.Aeson (Value)
-import Data.Aeson.Lens (key, _String)
+import Data.Aeson.Lens (key, _String, _Number)
 import qualified Data.ByteString as B
+import Data.Maybe (fromJust)
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import qualified Data.Vector as V
@@ -12,6 +14,8 @@ import Text.Regex.PCRE ((=~))
 
 import Github (Github, runGithub)
 import PullRequest (PullRequest (..), pullRequest, ourStatus, postStatus)
+
+import Web.Scotty
 
 auth :: IO B.ByteString
 auth = B.init <$> B.readFile "../token"
@@ -47,5 +51,12 @@ isApproval comment = body =~ pattern
 
 main :: IO ()
 main = do token <- auth
-          r <- runGithub token "madjar" "approvd-protos" $ handlePR  1
-          print r
+          scotty 3000 $ do
+            post "/payload" $ do
+              eventType <- header "X-Github-Event"
+              when (eventType == Just "issue_comment") $ do
+                -- TODO : check it is indeed a PR
+                body <- jsonData
+                let prNumber = truncate $ fromJust $ (body::Value) ^? key "issue" . key "number" . _Number
+                result <- liftIO $ runGithub token "madjar" "approvd-protos" $ handlePR prNumber
+                liftIO $ putStrLn $ show prNumber ++ " : " ++ show result

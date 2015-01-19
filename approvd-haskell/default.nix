@@ -2,6 +2,7 @@ with (import <nixpkgs> {}).pkgs;
 let pkg = haskellngPackages.callPackage
             ({ mkDerivation, aeson, base, bytestring, lens, lens-aeson, mtl
              , regex-pcre, stdenv, text, transformers, wreq, reserve, hlint
+             , scotty
              }:
              mkDerivation {
                pname = "approvd";
@@ -11,7 +12,7 @@ let pkg = haskellngPackages.callPackage
                isExecutable = true;
                buildDepends = [
                  aeson base bytestring lens lens-aeson mtl regex-pcre text
-                 transformers wreq
+                 transformers wreq scotty
                ] ++ lib.optionals lib.inNixShell [ reserve hlint ];
                license = stdenv.lib.licenses.unfree;
              }) {};
