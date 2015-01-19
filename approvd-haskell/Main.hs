@@ -24,23 +24,24 @@ auth = B.init <$> B.readFile "../token"
 -- | Do stuff with a pull request.  Honesly, we just do random stuff
 -- to check the rest work. Here, for example, we set the status of the
 -- last commit of the pull request to pending if it's not already set
-handlePR :: Int -> Github (String, Bool)
+handlePR :: Int -> Github (String, String, Bool)
 handlePR pr =
   do pull <- pullRequest pr
      statusObj <- ourStatus $ getSha pull
      comments <- getRelevantComments pull
      let status = T.unpack . (^. key "state" . _String) <$> statusObj
+         message = T.unpack . (^. key "description" . _String) <$> statusObj
          totalComments = V.length comments
          approvingComments = V.length $ mfilter isApproval comments
          newStatus = if approvingComments > 0
                      then "success"
                      else "pending"
-         message = "Seen " ++ show totalComments ++ " relevant comments, with " ++ show approvingComments ++ " approvals."
+         newMessage = "Seen " ++ show totalComments ++ " relevant comments, with " ++ show approvingComments ++ " approvals."
 
-     case status of
-      Just s | s == newStatus -> return (s, False)
-      _ -> postStatus (getSha pull) newStatus message
-           >> return (newStatus, True)
+     case (status, message) of
+      (Just s, Just m) | s == newStatus && m == newMessage -> return (s, m, False)
+      _ -> postStatus (getSha pull) newStatus newMessage
+           >> return (newStatus, newMessage, True)
 
 
 isApproval :: Value -> Bool
