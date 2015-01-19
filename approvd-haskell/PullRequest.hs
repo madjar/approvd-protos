@@ -5,14 +5,14 @@ import Control.Lens ((^.))
 import Control.Monad (mfilter)
 import Data.Aeson.Lens (key, _String, _Array)
 import Data.Aeson (object, (.=), Value, Array)
-import Data.Foldable (find)
+import Data.Foldable (find, forM_)
 import qualified Data.ByteString.Lazy.Char8 as L
 import qualified Data.Text as T
+import qualified Data.Vector as V
 
 import Github (Github, get, getRepo, postRepo)
 
 import Debug.Trace
-import Control.Lens ((^?))
 
 data PullRequest = PullRequest { getPR :: L.ByteString
                                , getSha :: String
@@ -32,14 +32,22 @@ pullRequest prId = do
   let sha = pr ^. key "head" . key "sha" . _String
   -- TODO parse as date
   pushDate <- commitPushDate sha
-  let relevant issue = traceShowId $ issue ^. key "created_at" . _String > pushDate
+  let relevant comment = comment ^. key "created_at" . _String > pushDate
       relevantComments = do comments <- issueComments prId
                             return $ mfilter relevant (comments ^. _Array)
   return $ PullRequest pr (T.unpack sha) relevantComments
 
--- TODO use the event API to find the push date of the commit (not the repo)
+-- To known when a commit was pushed, I should have a webhook and listend for pull_request events with the synchronized action. Otherwise, I have to resort to the following hack.
 commitPushDate :: T.Text -> Github T.Text
-commitPushDate = undefined
+commitPushDate sha =
+  do events <- getRepo ["events"]
+     let event = V.find f (events ^. _Array)
+     case event of
+      Just e -> return $ e ^. key "created_at" . _String
+      Nothing -> trace ("XXX: No date found for " ++ T.unpack sha) $ return ""
+  where f event = isPushEvent event && eventSha event == sha
+        isPushEvent event = event ^. key "type" . _String == "PushEvent"
+        eventSha event = event ^. key "payload" . key "head" . _String
 
 -- | Return the status we previously gave to a commit
 ourStatus :: String -> Github (Maybe Value)

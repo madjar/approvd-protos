@@ -10,8 +10,6 @@ import Data.Text.Encoding (encodeUtf8)
 import qualified Data.Vector as V
 import Text.Regex.PCRE ((=~))
 
-import Debug.Trace
-
 import Github (Github, runGithub)
 import PullRequest (PullRequest (..), pullRequest, ourStatus, postStatus)
 
@@ -34,7 +32,6 @@ handlePR pr =
                      then "success"
                      else "pending"
          message = "Seen " ++ show totalComments ++ " relevant comments, with " ++ show approvingComments ++ " approvals."
-     traceShowM message
 
      case status of
       Just s | s == newStatus -> return (s, False)
