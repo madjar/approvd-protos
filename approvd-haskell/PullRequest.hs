@@ -1,16 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
-module PullRequest (PullRequest (..), issueComments, pullRequest, ourStatus, postStatus) where
+module PullRequest (PullRequest (..), issueComments, pullRequest, ourStatus, postStatus, handlePR) where
 
+import Control.Applicative ((<$>))
 import Control.Lens ((^.))
 import Control.Monad (mfilter)
 import Data.Aeson.Lens (key, _String, _Array)
 import Data.Aeson (object, (.=), Value, Array)
-import Data.Foldable (find, forM_)
+import Data.Foldable (find)
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy.Char8 as L
 import qualified Data.Text as T
+import Data.Text.Encoding (encodeUtf8)
 import qualified Data.Vector as V
+import Text.Regex.PCRE ((=~))
 
-import Github (Github, get, getRepo, postRepo)
+import Github (Github, getRepo, postRepo)
 
 import Debug.Trace
 
@@ -65,3 +69,31 @@ postStatus sha state description =
   postRepo ["statuses", sha] $ object [ "state" .= state
                                       , "description" .= description
                                       , "context" .= context ]
+
+-- | Do stuff with a pull request.  Honesly, we just do random stuff
+-- to check the rest work. Here, for example, we set the status of the
+-- last commit of the pull request to pending if it's not already set
+handlePR :: Int -> Github (String, String, Bool)
+handlePR pr =
+  do pull <- pullRequest pr
+     statusObj <- ourStatus $ getSha pull
+     comments <- getRelevantComments pull
+     let status = T.unpack . (^. key "state" . _String) <$> statusObj
+         message = T.unpack . (^. key "description" . _String) <$> statusObj
+         totalComments = V.length comments
+         approvingComments = V.length $ mfilter isApproval comments
+         newStatus = if approvingComments > 0
+                     then "success"
+                     else "pending"
+         newMessage = "Seen " ++ show totalComments ++ " relevant comments, with " ++ show approvingComments ++ " approvals."
+
+     case (status, message) of
+      (Just s, Just m) | s == newStatus && m == newMessage -> return (s, m, False)
+      _ -> postStatus (getSha pull) newStatus newMessage
+           >> return (newStatus, newMessage, True)
+
+
+isApproval :: Value -> Bool
+isApproval comment = body =~ pattern
+  where pattern = "^[Aa]pprove?d" :: B.ByteString
+        body = encodeUtf8 $ comment ^. key "body" . _String
