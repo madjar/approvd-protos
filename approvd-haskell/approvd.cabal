@@ -21,12 +21,15 @@ executable approvd-haskell
   -- other-extensions:    
   build-depends:       aeson
                      , base >=4.7 && <4.8
+                     , blaze-html
                      , bytestring
+                     , http-types
                      , lens
                      , lens-aeson
                      , mtl
                      , regex-pcre
                      , scotty
+                     , shakespeare
                      , text
                      , transformers
                      , vector
