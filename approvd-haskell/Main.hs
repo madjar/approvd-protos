@@ -15,6 +15,8 @@ import qualified Data.Text.Lazy as T
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import qualified Network.Wreq as W
 import Web.Scotty
+import Web.Cookie
+import Web.Scotty.Cookie
 import Debug.Trace
 import Data.Monoid (mconcat)
 
@@ -41,10 +43,16 @@ githubAuthorize = "https://github.com/login/oauth/authorize" `T.append` qs
                , ("scope", "write:repo_hook,repo")
                , ("state", secretState) ]
 
+
 main :: IO ()
 main = do token <- auth
           scotty 3000 $ do
-            get "/" $
+            get "/" $ do
+              token <- getCookie "github_token"
+              user <- case token of
+                Just t -> do r <- liftIO $ G.runGithub (encodeUtf8 t) "" "" $ G.get ["user"]
+                             return $ r ^? key "name" . _String
+                Nothing -> return Nothing
               html $ renderHtml $(shamletFile "index.hamlet")
             get "/login" $
               redirect githubAuthorize
@@ -60,10 +68,9 @@ main = do token <- auth
                         , ("client_secret", clientSecret)
                         , ("code", code) ]
               r <- liftIO $ W.postWith opts url dat
-              let token = encodeUtf8 $ r ^. W.responseBody . key "access_token" . _String
-              user <- liftIO $ G.runGithub token "" "" $ G.get ["user"]
-              html $ mconcat [ "Hello ", T.fromStrict $ user ^. key "name" . _String
-                             , ". Ce microframework gère pas les cookies, donc je vais arreter là."]
+              let githubToken = r ^. W.responseBody . key "access_token" . _String
+              setCookie $  (makeSimpleCookie "github_token" githubToken) { setCookiePath = Just "/" }
+              redirect "/"
             post "/payload" $ do
               eventType <- header "X-Github-Event"
               when (eventType == Just "issue_comment") $ do
